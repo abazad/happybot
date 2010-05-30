@@ -154,7 +154,7 @@
 			'USER', 'USERHOST', 'USERS', 'VERSION', 'WALLOPS', 'WHO', 'WHOIS', 'WHOWAS');
 */
 		public function __construct($data = null) {
-			if (!is_null($data) {
+			if (!is_null($data)) {
 				$this($data);
 			}
 		}
@@ -226,14 +226,14 @@
 				$this->reset();
 				if (is_array($data) or is_object($data)) {
 					$result = $this->importMessage($data);
-				} elseif (is_string($data) {
+				} elseif (is_string($data)) {
 					$result = $this->parseMessage($data);
 				}
 			}
 			return $result;
 		}
 
-		public __get($name) {
+		public function __get($name) {
 			if (array_key_exists($this->__messageData, $name)) {
 				return $this->__messageData[$_name];
 			} elseif ($name === 'locked') {
@@ -242,7 +242,7 @@
 			throw new Exception('Undefined property via __get()');
 		}
 
-		public __set($name, $value) {
+		public function __set($name, $value) {
 			if (array_key_exists($this->__messageData, $name) ) {
 				if (!$this->__locked) {
 					$this->__messageData[$name] = $value;
