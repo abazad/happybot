@@ -21,7 +21,7 @@
 			}
 		}
 
-		private function connect($server = null, $port = null, $passwd = null, $nick = null) {
+		public function connect($server = null, $port = null, $passwd = null, $nick = null) {
 			$result = false;  //was connection successful?
 			$errno = null;
 			$errstr = null;
@@ -49,8 +49,10 @@
 
 				//wait for the MOTD or for the server to disconnect us.
 				while ($this->currentServer['connect_status'] == 'connecting' && !feof($this->currentServer['Socket'])) {
-					$this->parseReceive();
+					$this->receive();
 				}
+			} else {
+				
 			}
 			return $this->connected();
 		}
@@ -69,13 +71,9 @@
 		public function receive() {
 			$line = fgets($this->currentServer['Socket'], 1024); //get a line of data from the server
 			if (!empty($line)) {
-				$Msg = new Message($line);
-				$this->beforeMessage($Msg);
-				$this->onMessage($Msg);
-				$this->afterMessage($Msg);
-				unset($Msg);	
+				return new IrcMessage($line);
 			} 
-			return $Msg;
+			return null;
 		}
 
 
@@ -155,7 +153,7 @@
 */
 		public function __construct($data = null) {
 			if (!is_null($data)) {
-				$this($data);
+				$this->__invoke($data);
 			}
 		}
 	
@@ -177,7 +175,7 @@
 		 */
 		private function __parseMessage($msg) {
 			$this->buffer = $msg;
-			$this->time_stamp = time();
+			$this->timeStamp = time();
 
 			//check for a prefixed message/command
 			if ($msg[0] == ':') {
@@ -225,32 +223,32 @@
 			if (!$this->__locked) {
 				$this->reset();
 				if (is_array($data) or is_object($data)) {
-					$result = $this->importMessage($data);
+					$result = $this->__importMessage($data);
 				} elseif (is_string($data)) {
-					$result = $this->parseMessage($data);
+					$result = $this->__parseMessage($data);
 				}
 			}
 			return $result;
 		}
 
 		public function __get($name) {
-			if (array_key_exists($this->__messageData, $name)) {
+			if (array_key_exists($name, $this->__messageData)) {
 				return $this->__messageData[$_name];
 			} elseif ($name === 'locked') {
 				return $this->__locked;
 			}
-			throw new Exception('Undefined property via __get()');
+			trigger_error("Attempting to access an undefined property ( {$name} ) of an IrcMessage via __get()");
 		}
 
 		public function __set($name, $value) {
-			if (array_key_exists($this->__messageData, $name) ) {
+			if (array_key_exists($name, $this->__messageData) ) {
 				if (!$this->__locked) {
 					$this->__messageData[$name] = $value;
 				} else {
 					throw new Exception('Attempting to set a protected property of a locked IrcMessage');
 				}
 			} elseif ($name !== 'locked') {
-				throw new Exception('Attempting to set an undefined property or alter lock state of an IrcMessage');
+				throw new Exception("Attempting to set an undefined property or alter lock state of an IrcMessage (property name: {$name})");
 			}
 			
 		}

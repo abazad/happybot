@@ -33,7 +33,7 @@
 						//need a call to the dispatcher here
 						$this->afterMessage($Msg);
 					}
-				} catch ($e) {
+				} catch (Exception $e) {
 					echo "oi! WTF! {$e} \n";
 				}
 			}
@@ -54,8 +54,8 @@
 				//need call to check for known triggers here
 				$Msg->lock();
 			} else {
-				throw new Exception('Incoming message is already locked!')
-
+				throw new Exception('Incoming message is already locked!');
+			}
 		}
 
 		public function onMessage($Msg) {
