@@ -12,15 +12,13 @@
 		public function __construct() {
 			//Server connection info
 			include("config.php");
-			$this->Server = new HappyView($IrcConfig);
+			$this->Server = new HappyView();
 			if ($this->Server) {
-				$this->Server->connect();
+				$this->Server->connect($IrcConfig);
 			}
 		}
 
-		/**
-		 * This is the bot's main loop.
-		 */
+		
 		public function start() {
 			$keepAlive = true;
 
@@ -59,17 +57,7 @@
 		}
 
 		public function onMessage($Msg) {
-			if ($Msg->msgNumber == "376") {
-				// 376 is the message number for the End of the MOTD for the server (The last thing displayed after a successful connection)
-				$this->afterConnect();
-			}
-			if ($Msg->command == "PING") {
-				// IRC Sends a "PING" command to the client which must be anwsered with a "PONG" or the client gets Disconnected
-				// Some irc servers have a "No Spoof" feature that sends a key after the PING Command that must be replied with PONG and the same key sent.
-				$this->sendCommand("PONG " . $Msg->content, true);
-			}
+	
 		}
-
-		
 	}
 ?>

@@ -4,7 +4,7 @@
 	 * this really needs to be rebuilt into the server registry
 	 */
 	
-	class HappyView {
+	final static class ConnectionManager {
 		//Connection config
 		private $currentConfig = array();
 
@@ -13,30 +13,30 @@
 			'Socket' => null,
 			'connect_status' => 'disconnected');
 
-		public function __construct($config){
-			if(!empty($config)) {
-				$this->currentConfig = $config;
-			} else {
-				return false;
-			}
+		public function __construct(){
 		}
 
 		public function connect($server = null, $port = null, $passwd = null, $nick = null) {
 			$result = false;  //was connection successful?
 			$errno = null;
 			$errstr = null;
+			$Msg = null;
 
-			if (!is_null($server)) {
-				$this->currentConfig['server'] = $server;
-			}
-			if (!is_null($port)) {
-				$this->currentConfig['server_port'] = $port;
-			}
-			if (!is_null($passwd)) {
-				$this->currentConfig['server_passwd'] = $passwd;
-			}
-			if (!is_null($nick)) {
-				$this->currentConfig['bot_name'] = $nick;
+			if (is_array($server)) {
+				$this->$currentConfig = $server;
+			} else {
+				if (!is_null($server)) {
+					$this->currentConfig['server'] = $server;
+				}
+				if (!is_null($port)) {
+					$this->currentConfig['server_port'] = $port;
+				}
+				if (!is_null($passwd)) {
+					$this->currentConfig['server_passwd'] = $passwd;
+				}
+				if (!is_null($nick)) {
+					$this->currentConfig['bot_name'] = $nick;
+				}
 			}
 			
 			$this->currentServer['Socket'] = @fsockopen( $this->currentConfig['server'], $this->currentConfig['server_port'], $errno, $errstr, 2);	
@@ -49,10 +49,11 @@
 
 				//wait for the MOTD or for the server to disconnect us.
 				while ($this->currentServer['connect_status'] == 'connecting' && !feof($this->currentServer['Socket'])) {
-					$this->receive();
+					$Msg = $this->receive();
+					if (!is_null($Msg) && $Msg->msgNumber == 376) {
+						$this->currentServer['connect_status'] = 'connected';
+					}
 				}
-			} else {
-				
 			}
 			return $this->connected();
 		}
@@ -69,11 +70,27 @@
 		}
 
 		public function receive() {
+			$Msg = null;
 			$line = fgets($this->currentServer['Socket'], 1024); //get a line of data from the server
 			if (!empty($line)) {
-				return new IrcMessage($line);
-			} 
-			return null;
+				$Msg = new IrcMessage($line);
+			}
+			$this->afterReceive($Msg);
+			return $Msg;
+		}
+
+
+		public function afterReceive(&$Msg) {
+                        if ($Msg->msgNumber == "376") {
+				// 376 is the message number for the End of the MOTD for the server (the last thing displayed after a successful connection)
+				 
+				$this->afterConnect();
+			}
+			if ($Msg->command == "PING") {
+				// IRC Sends a "PING" command to the client which must be anwsered with a "PONG" or the client gets Disconnected
+				// Some irc servers have a "No Spoof" feature that sends a key after the PING Command that must be replied with PONG and the same key sent.
+				$this->sendCommand("PONG " . $Msg->content, true);
+			}
 		}
 
 
@@ -160,6 +177,7 @@
 		public function lock() {
 			$this->__locked = true;
 		}
+
 		public function reset() {
 			if (!$this->__locked) {
 				$this->__messageData = $this->_messageDataDefault;
@@ -183,6 +201,7 @@
 				$window = strpos($msg, " ");
 				$this->prefix = substr($msg, 1, $window - 1);
 				$msg = substr($msg, $window + 1);
+
 				//check for a nick and extract it
 				$window = strpos($this->prefix,'!');
 				if ($window) {
@@ -257,5 +276,7 @@
 
 	//Really unsure what needs to be here yet :)
 	class HappyController {
+         
+        //needs methods to connect to the server list, register for callbacks, and to accept/clear target server.
 	}
 ?>
