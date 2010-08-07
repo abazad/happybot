@@ -12,19 +12,16 @@
 		public function __construct() {
 			//Server connection info
 			include("config.php");
-			$this->Server = new HappyView();
-			if ($this->Server) {
-				$this->Server->connect($IrcConfig);
-			}
+			$serverId = ConnectionManager::registerServer($IrcConfig);
+			ConnectionManager::connect($serverId);
 		}
 
 		
 		public function start() {
 			$keepAlive = true;
-
-			while ($this->Server->connected() && $keepAlive) {
+			while (ConnectionManager::connected() && $keepAlive) {
 				try {
-					$Msg = $this->Server->receive();
+					$Msg = ConnectionManager::receive();
 					if ($Msg) {
 						$this->beforeMessage($Msg);
 						$this->onMessage($Msg);
@@ -36,7 +33,7 @@
 				}
 			}
 
-			$this->Server->disconnect();
+			ConnectionManager::disconnect();
 		}
 	
 		public function beforeMessage(&$Msg) {
@@ -57,7 +54,12 @@
 		}
 
 		public function onMessage($Msg) {
-	
+			print_r($Msg);
+//			if (str_pos(
+		}
+
+		public function afterMessage($Msg) {
+			echo "[RECV] " . $Msg->buffer . "\n";
 		}
 	}
 ?>

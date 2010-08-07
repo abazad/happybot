@@ -4,102 +4,135 @@
 	 * this really needs to be rebuilt into the server registry
 	 */
 	
-	final static class ConnectionManager {
+	final class ConnectionManager {
 		//Connection config
-		private $currentConfig = array();
-
-		//Connection to the server
-		private $currentServer = array(
-			'Socket' => null,
-			'connect_status' => 'disconnected');
-
+		private static $__serverList = array();
+		private static $__activeServer = null;
 		public function __construct(){
 		}
 
-		public function connect($server = null, $port = null, $passwd = null, $nick = null) {
-			$result = false;  //was connection successful?
-			$errno = null;
-			$errstr = null;
-			$Msg = null;
+		public function __destruct() {
+		}
 
-			if (is_array($server)) {
-				$this->$currentConfig = $server;
-			} else {
-				if (!is_null($server)) {
-					$this->currentConfig['server'] = $server;
-				}
-				if (!is_null($port)) {
-					$this->currentConfig['server_port'] = $port;
-				}
-				if (!is_null($passwd)) {
-					$this->currentConfig['server_passwd'] = $passwd;
-				}
-				if (!is_null($nick)) {
-					$this->currentConfig['bot_name'] = $nick;
+		public static function registerServer($serverList) {
+			$serverId = null;
+			if (is_array($serverList)) {
+				//TODO Redo this check with a full validation of the server
+				if (isset($serverList['server'])) {
+					self::$__serverList[] = $serverList;
+					$serverId = count(self::$__serverList) - 1;
+					self::$__serverList[$serverId]['list_id'] = $serverId;
+				} else {
+				//TODO  implement multiple server registration.
 				}
 			}
-			
-			$this->currentServer['Socket'] = @fsockopen( $this->currentConfig['server'], $this->currentConfig['server_port'], $errno, $errstr, 2);	
-			if ($this->currentServer['Socket']) {
-				$this->currentServer['connect_status'] = 'connecting';
-				//We have connected to the server, now we have to send the login commands.
-//				$this->sendCommand("PASS {$this->currentConfig['server_password']}", true); //Sends the password not needed for most servers
-				$this->sendCommand("NICK {$this->currentConfig['bot_name'][0]}", true); //sends the nickname FIXME
-				$this->sendCommand("USER {$this->currentConfig['bot_name'][0]} USING YOAR MOMS", true); //sends the user must have 4 paramters
+			return $serverId;
+		}
+		
 
-				//wait for the MOTD or for the server to disconnect us.
-				while ($this->currentServer['connect_status'] == 'connecting' && !feof($this->currentServer['Socket'])) {
-					$Msg = $this->receive();
-					if (!is_null($Msg) && $Msg->msgNumber == 376) {
-						$this->currentServer['connect_status'] = 'connected';
+		/**
+		 * Set a server as actvive or clear the active server
+		 * @param serverId mixed numeric server id or null to clear active server
+		 * @return boolian was operation successful
+		 */
+		public static function setActive($serverId) {
+			$result = false;
+			if (is_null($serverId)) {
+				self::$__activeServer = null;
+				$result = true;
+			}
+			if (isset(self::$__serverList[$serverId])) {
+				self::$__activeServer = &self::$__serverList[$serverId];
+				$result = true;
+			}
+			return $result;
+		}
+
+		public static function connect($serverId = 'null') {
+			$result = false;  //was connection successful?
+			$errno = null;		//used to catch error numbers for socket connect
+			$errstr = null;	//used to catch error details for socket connect
+			$Msg = null;	//used to make catch inbound server messages.
+			$currentServer = null; //refrence to the server that is being operated on.
+			
+			if (is_null($serverId)) {
+				$serverId = array_keys(self::$__serverList);
+			}
+			if (!is_array($serverId)) {
+				$serverId = array($serverId);
+			}
+			foreach ($serverId as $currentId) {
+				if (self::setActive($currentId)) {
+					$currentServer = &self::$__serverList[$currentId];
+					$currentServer['Socket'] = @fsockopen($currentServer['server'], $currentServer['server_port'], $errno, $errstr, 2);	
+					if ($currentServer['Socket']) {
+						$currentServer['connect_status'] = 'connecting';
+						//We have connected to the server, now we have to send the login commands.
+//						self::sendCommand("PASS {$currentServer['server_password']}", null, true); //Sends the password not needed for most servers
+						self::sendCommand("NICK {$currentServer['bot_name'][0]}", null, true); //sends the nickname FIXME
+						self::sendCommand("USER {$currentServer['bot_name'][0]} USING YOAR MOMS", null, true); //sends the user must have 4 paramters
+						
+						//wait for the MOTD or for the server to disconnect us.
+						//this is not optimum, once we have each server in it's own object, let it manage watching for messages.
+						while ($currentServer['connect_status'] == 'connecting' && !feof($currentServer['Socket'])) {
+							$Msg = self::receive($currentId);
+							if (!is_null($Msg) && $Msg->msgNumber == 376) {
+								$currentServer['connect_status'] = 'connected';
+							}
+						}
 					}
 				}
 			}
-			return $this->connected();
+			return $result;
 		}
 
-		public function disconnect() {
-			if ($this->connected()) {
+		public static function disconnect($serverId = null, $quitMessage = null) {
+			if (self::connected()) {
 
 			}
 			return false;
 		}
 
-		public function connected () {
-			return ($this->currentServer['connect_status'] == 'connected' && !feof($this->currentServer['Socket']));
+		public static function connected ($server = null) {
+			if (is_null($server)) {
+				$server = self::$__activeServer;
+			}
+			if (array_key_exists($server['list_id'], self::$__serverList)) {
+				return ($server['connect_status'] == 'connected' && !feof($server['Socket']));
+			}
 		}
 
-		public function receive() {
+		public static function receive($serverId = null) {
 			$Msg = null;
-			$line = fgets($this->currentServer['Socket'], 1024); //get a line of data from the server
+			$line = fgets(self::$__activeServer['Socket'], 1024); //get a line of data from the server
 			if (!empty($line)) {
 				$Msg = new IrcMessage($line);
 			}
-			$this->afterReceive($Msg);
+			self::__afterReceive($Msg);
 			return $Msg;
 		}
 
 
-		public function afterReceive(&$Msg) {
-                        if ($Msg->msgNumber == "376") {
+		private function __afterReceive(&$Msg) {
+			if ($Msg->msgNumber == "376") {
 				// 376 is the message number for the End of the MOTD for the server (the last thing displayed after a successful connection)
-				 
-				$this->afterConnect();
+				self::__afterConnect();
 			}
+			
 			if ($Msg->command == "PING") {
 				// IRC Sends a "PING" command to the client which must be anwsered with a "PONG" or the client gets Disconnected
 				// Some irc servers have a "No Spoof" feature that sends a key after the PING Command that must be replied with PONG and the same key sent.
-				$this->sendCommand("PONG " . $Msg->content, true);
+				self::sendCommand("PONG " . $Msg->content, null, true);
 			}
 		}
 
 
 
-		private function afterConnect() {
-			$this->currentServer['connect_status'] = 'connected';
-			stream_set_blocking($this->currentServer['Socket'], TRUE);
-		        stream_set_timeout($this->currentServer['Socket'], 5); 
-			$this->sendCommand("JOIN {$this->currentConfig['channel']}");
+		private function __afterConnect() {
+			self::$__activeServer['connect_status'] = 'connected';
+			stream_set_blocking(self::$__activeServer['Socket'], TRUE);
+		        stream_set_timeout(self::$__activeServer['Socket'], 5); 
+			self::sendCommand("JOIN " . self::$__activeServer['channel']);
 		}
 
 		/**
@@ -107,11 +140,11 @@
 		 *	$cmd Command to send,
 		 *	$override don't check for connection (dangerous)
 		 */
-		private function sendCommand ($cmd, $override = false) {
+		public static function sendCommand ($cmd, $serverId = null, $override = false) {
 			$cmd = $cmd . "\n\r";
-			if ($override || $this->connected()) {	
-				@fwrite($this->currentServer['Socket'], $cmd, strlen($cmd)); //sends the command to the server
-				echo "[SEND] $cmd \n"; //displays it on the screen
+			if ($override || self::connected()) {	
+				echo "[SEND] $cmd"; //displays it on the screen
+				@fwrite(self::$__activeServer['Socket'], $cmd, strlen($cmd)); //sends the command to the server
 				return true;
 			} else {
 				return false;
@@ -119,7 +152,7 @@
 		}
 
 		private function say($target, $msg) {
-			return $this->sendCommand("PRIVMSG {$target} :{$msg}");
+			return self::sendCommand("PRIVMSG {$target} :{$msg}");
 		}
 	}
 
@@ -252,7 +285,7 @@
 
 		public function __get($name) {
 			if (array_key_exists($name, $this->__messageData)) {
-				return $this->__messageData[$_name];
+				return $this->__messageData[$name];
 			} elseif ($name === 'locked') {
 				return $this->__locked;
 			}
