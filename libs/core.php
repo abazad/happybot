@@ -150,10 +150,6 @@
 				return false;
 			}
 		}
-
-		private function say($target, $msg) {
-			return self::sendCommand("PRIVMSG {$target} :{$msg}");
-		}
 	}
 
 	/**
@@ -309,7 +305,10 @@
 
 	//Really unsure what needs to be here yet :)
 	class HappyController {
-         
+       	
+		protected function say($target, $message, $serverId = null) {
+			return ConnectionManager::sendCommand("PRIVMSG {$target} :{$message}", $serverId);
+		}
         //needs methods to connect to the server list, register for callbacks, and to accept/clear target server.
 	}
 ?>

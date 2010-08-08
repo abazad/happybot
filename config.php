@@ -19,5 +19,5 @@ $IrcConfig['nickserv_pass'] = '';
 
 
 //Server Chanel, After connecting to the IRC server this is the channel it will join.
-$IrcConfig['channel'] = "#happytest";
+$IrcConfig['channel'] = "#happyplace";
 ?> 

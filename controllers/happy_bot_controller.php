@@ -39,7 +39,7 @@
 		public function beforeMessage(&$Msg) {
 			if (!$Msg->locked) {
 				//fill out more info on a private message.
-				if ($this->command == "PRIVMSG") {
+				if ($Msg->command == "PRIVMSG") {
 					$window = strpos($Msg->content, " ");
 					if ($Msg->content[0] == '#') {
 						$Msg->channel = substr($Msg->content, 0, $window);
@@ -54,8 +54,13 @@
 		}
 
 		public function onMessage($Msg) {
-			print_r($Msg);
-//			if (str_pos(
+
+	//			print_r($Msg);
+			if (strpos(strtolower($Msg->content), 'hi') !== false) {
+				$target = (is_null($Msg->channel))? $Msg->sender : $Msg->channel;
+				$this->say($target, "Well hi {$Msg->sender}!");
+				echo "responded";
+			}
 		}
 
 		public function afterMessage($Msg) {
