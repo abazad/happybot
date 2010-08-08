@@ -9,12 +9,18 @@ class HappyBotController extends HappyController {
 	public $Server;
 
 
-	public function __construct($IrcConfig) {
+	/**
+	 * Loads the default config and connects the servers
+	 */
+	public function __construct() {
+		include("config.php");
 		$serverId = ConnectionManager::registerServer($IrcConfig);
 		ConnectionManager::connect($serverId);
 	}
 
-
+	/**
+	 * Main loop, catches messages and then dispatches them
+	 */
 	public function start() {
 		$keepAlive = true;
 		while (ConnectionManager::connected() && $keepAlive) {
@@ -33,7 +39,13 @@ class HappyBotController extends HappyController {
 
 		ConnectionManager::disconnect();
 	}
-
+	
+	/**
+	 * First callback that is fired when a Message is received.  Responsible for cleaning up the message object,
+	 *  locking it, and creating the list of callbacks that should be triggered.
+	 *  @return array the list of callbacks to fire.
+	 *  @todo callback lists
+	 */
 	public function beforeMessage(&$Msg) {
 		if (!$Msg->locked) {
 			//fill out more info on a private message.
@@ -50,17 +62,21 @@ class HappyBotController extends HappyController {
 			throw new Exception('Incoming message is already locked!');
 		}
 	}
-
+	/**
+	 * Start of the main callback section. Will handle textual response triggers 
+	 * @param Msg the current message object
+	 */
 	public function onMessage($Msg) {
-
-		//			print_r($Msg);
 		if (strpos(strtolower($Msg->content), 'hi') !== false) {
 			$target = (is_null($Msg->channel))? $Msg->sender : $Msg->channel;
 			$this->say($target, "Well hi {$Msg->sender}!");
 			echo "responded";
 		}
 	}
-
+	/**
+	 * Cleanup callbacks
+	 * @param Msg the current message object
+	 */
 	public function afterMessage($Msg) {
 		echo "[RECV] " . $Msg->buffer . "\n";
 	}
