@@ -13,7 +13,15 @@ final class ConnectionManager {
 
 	public function __destruct() {
 	}
-
+	
+	/**
+	 * Add a server or sever to the registry of known servers
+	 *
+	 * @param array serverList One or more servers to register, using format from config file
+	 * @return the id of the server that was registered, or null for failure.
+	 * @todo set up proper validation for the server configuration, once that has been stablized
+	 * @todo get multiple server registration working
+	 */
 	public static function registerServer($serverList) {
 		$serverId = null;
 		if (is_array($serverList)) {
@@ -48,6 +56,12 @@ final class ConnectionManager {
 		return $result;
 	}
 
+	/**
+	 * Connect to a server or servers, specified in $serverId
+	 *
+	 * @param mixed serverId the server(s) to connect too.  int or array of ints
+	 * @return boolean success
+	 */
 	public static function connect($serverId = 'null') {
 		$result = false;  //was connection successful?
 		$errno = null;		//used to catch error numbers for socket connect
@@ -68,8 +82,8 @@ final class ConnectionManager {
 				if ($currentServer['Socket']) {
 					$currentServer['connect_status'] = 'connecting';
 					//We have connected to the server, now we have to send the login commands.
-					//						self::sendCommand("PASS {$currentServer['server_password']}", null, true); //Sends the password not needed for most servers
-					self::sendCommand("NICK {$currentServer['bot_name'][0]}", null, true); //sends the nickname FIXME
+					//self::sendCommand("PASS {$currentServer['server_password']}", null, true); //Sends the password not needed for most servers FIXME we need a null/empty password check
+					self::sendCommand("NICK {$currentServer['bot_name'][0]}", null, true); //sends the nickname FIXME. This only sends first nickname, won't cycle through to secondary ones
 					self::sendCommand("USER {$currentServer['bot_name'][0]} USING YOAR MOMS", null, true); //sends the user must have 4 paramters
 
 					//wait for the MOTD or for the server to disconnect us.
@@ -92,7 +106,10 @@ final class ConnectionManager {
 		}
 		return false;
 	}
-
+	/**
+	 * check to see if a server is connected
+	 *  @param array server the server object 
+	 */
 	public static function connected ($server = null) {
 		if (is_null($server)) {
 			$server = self::$__activeServer;
@@ -101,7 +118,11 @@ final class ConnectionManager {
 			return ($server['connect_status'] == 'connected' && !feof($server['Socket']));
 		}
 	}
-
+	/**
+	 * Checks the active server for a message.  prolly should be inside the Server Object and
+	 *  be replaced by a polling function.
+	 *  @param integer serverId the id of the server to check {optional}
+	 */
 	public static function receive($serverId = null) {
 		$Msg = null;
 		$line = fgets(self::$__activeServer['Socket'], 1024); //get a line of data from the server
