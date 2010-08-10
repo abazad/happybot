@@ -100,6 +100,11 @@ final class ConnectionManager {
 		return $result;
 	}
 
+	
+	/**
+	 * Disconnect the server. Uh.
+	 * @todo uh.. do this? heh.
+	 */
 	public static function disconnect($serverId = null, $quitMessage = null) {
 		if (self::connected()) {
 
@@ -133,7 +138,11 @@ final class ConnectionManager {
 		return $Msg;
 	}
 
-
+	/**
+	 * Used to finish the connection to the server and maintain the connection.
+	 * These need to be checked inside of the connect() call and on each message.
+	 * @todo move to inside of the server object.
+	 */
 	private function __afterReceive(&$Msg) {
 		if ($Msg->msgNumber == "376") {
 			// 376 is the message number for the End of the MOTD for the server (the last thing displayed after a successful connection)
@@ -148,7 +157,10 @@ final class ConnectionManager {
 	}
 
 
-
+	/**
+	 * Sets options on the socket.
+	 * Prolly need to drop the blocking in favor of using the ConnectionManger to poll.
+	 */
 	private function __afterConnect() {
 		self::$__activeServer['connect_status'] = 'connected';
 		stream_set_blocking(self::$__activeServer['Socket'], TRUE);
@@ -157,9 +169,11 @@ final class ConnectionManager {
 	}
 
 	/**
-	 *	Send a command to the IRC server
-	 *	$cmd Command to send,
-	 *	$override don't check for connection (dangerous)
+	 * Send a command to the IRC server
+	 * @param string cmd Command to send,
+	 * @param integer serverId the server id to check for.
+	 * @param bool override don't check for connection. Needed for connecting.
+	 * @todo need to seperate this into the server object and the code necc. for safty checking server.
 	 */
 	public static function sendCommand ($cmd, $serverId = null, $override = false) {
 		$cmd = $cmd . "\n\r";
@@ -228,6 +242,9 @@ class IrcMessage {
 		$this->__locked = true;
 	}
 
+	/**
+	 * Reset the object to default status.
+	 */
 	public function reset() {
 		if (!$this->__locked) {
 			$this->__messageData = $this->_messageDataDefault;
@@ -238,8 +255,8 @@ class IrcMessage {
 	/**
 	 * Does basic parsing of a string format message (mostly inbound from irc server).
 	 * The filled out data is inserted into the object
-	 * $msg @string The message to parse
-	 * return none
+	 * @param string $msg @string The message to parse
+	 * @return none
 	 */
 	private function __parseMessage($msg) {
 		$this->buffer = $msg;
@@ -299,7 +316,10 @@ class IrcMessage {
 		}
 		return $result;
 	}
-
+	/**
+	 * Getter method.  All the accessible properties of the object are stored in a private array.
+	 * This method checks the existance and returns it.
+	 */
 	public function __get($name) {
 		if (array_key_exists($name, $this->__messageData)) {
 			return $this->__messageData[$name];
@@ -309,6 +329,9 @@ class IrcMessage {
 		trigger_error("Attempting to access an undefined property ( {$name} ) of an IrcMessage via __get()");
 	}
 
+	/**
+	 *  Setter method.  Only allows for existing properties, and will not allow protected properties to be set when the object is locked
+	 */
 	public function __set($name, $value) {
 		if (array_key_exists($name, $this->__messageData) ) {
 			if (!$this->__locked) {
