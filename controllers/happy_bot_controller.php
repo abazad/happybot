@@ -15,7 +15,7 @@ class HappyBotController extends HappyController {
 	public function __construct() {
 		include("config.php");
 		$serverId = ConnectionManager::registerServer($IrcConfig);
-		ConnectionManager::connect($serverId);
+//		ConnectionManager::connect($serverId);  //not needed right now, auto-connects
 	}
 
 	/**
@@ -48,14 +48,6 @@ class HappyBotController extends HappyController {
 	 */
 	public function beforeMessage(&$Msg) {
 		if (!$Msg->locked) {
-			//fill out more info on a private message.
-			if ($Msg->command == "PRIVMSG") {
-				$window = strpos($Msg->content, " ");
-				if ($Msg->content[0] == '#') {
-					$Msg->channel = substr($Msg->content, 0, $window);
-				}
-				$Msg->content = substr($Msg->content, $window + 2);
-			}
 			//need call to check for known triggers here
 			$Msg->lock();
 		} else {
@@ -70,7 +62,6 @@ class HappyBotController extends HappyController {
 		if (strpos(strtolower($Msg->content), 'hi') !== false) {
 			$target = (is_null($Msg->channel))? $Msg->sender : $Msg->channel;
 			$this->say($target, "Well hi {$Msg->sender}!");
-			echo "responded";
 		}
 	}
 	/**
@@ -78,7 +69,6 @@ class HappyBotController extends HappyController {
 	 * @param Msg the current message object
 	 */
 	public function afterMessage($Msg) {
-		echo "[RECV] " . $Msg->buffer . "\n";
 	}
 }
 ?>
