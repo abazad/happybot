@@ -272,7 +272,7 @@ class HappyServer {
 		$line = fgets($this->__Socket, 1024); //get a line of data from the server
 		if (!empty($line)) {
 			$Msg = new IrcMessage($line);
-			echo "[RECV] " . $Msg->buffer . "\n";
+			echo "[RECV] " . $line . "\n";
 			if (!is_null($Msg)) {
 				$this->__afterReceive($Msg);
 			}
@@ -291,7 +291,7 @@ class HappyServer {
 		$cmd = $cmd . "\n\r";
 		if ($this->__connectStatus == 'connecting' || $this->connected()) {
 			echo "[SEND] $cmd"; //displays it on the screen
-			@fwrite($this->__socket, $cmd, strlen($cmd)); //sends the command to the server
+			@fwrite($this->__Socket, $cmd, strlen($cmd)); //sends the command to the server
 			$result = true;
 		}
 		return $result;
@@ -337,7 +337,7 @@ class HappyServer {
 	 * @todo nickserv
 	 */
 	private function __afterConnect() {
-		$this->sendCommand("JOIN " . $this->activeServer['channel']);
+		$this->sendCommand("JOIN " . $this->__config['channel']);
 	}
 }
 
