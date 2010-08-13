@@ -2,6 +2,7 @@
 
 /**
  * this really needs to be rebuilt into the server registry
+ * Abstract it out to handle HTTP requests as well?
  */
 
 final class ConnectionManager {
@@ -56,105 +57,154 @@ final class ConnectionManager {
 	}
 
 	/**
+	 * This can likely be turned into a utility function, or it could disappear in dis/connect()refactor
+	 * @return array list of matching servers
+	 * @todo some buggy logic in condition, unknown condition will result in full list
+	 */
+	private static function __allServers($condition = null) {
+		$list = array_keys(self::$__serverList);
+		$Server = null;
+		switch ($condition) {
+			case 'connected' :
+					$condition = true;
+					break;
+			case 'disconnected' :
+					$condition = false;
+					break;
+			default : 
+				$condition = null;
+		}
+		
+		if (!is_null($condition)) {
+			foreach ($list as $key => $id) {
+				$Server = self::$__serverList[$id];
+				if ($Server->connected() != $condition) {
+					unset($list[$key]);
+				}
+			}
+		}
+		return $list;
+	}
+
+	/**
 	 * Connect to a server or servers, specified in $serverId
 	 *
-	 * @param mixed serverId the server(s) to connect too.  int or array of ints
+	 * @param mixed serverId the server(s) to connect too.  int or array of int
 	 * @return boolean success
+	 * @todo return is bull on this
 	 */
 	public static function connect($serverId = 'null') {
-		$result = false;  //was connection successful?
-		$errno = null;		//used to catch error numbers for socket connect
-		$errstr = null;	//used to catch error details for socket connect
-		$Msg = null;	//used to make catch inbound server messages.
+		$error = false;  //was connection successful?
 		$currentServer = null; //refrence to the server that is being operated on.
-			
+
+		//if the server is not specified, connect everything!
 		if (is_null($serverId)) {
-			$serverId = array_keys(self::$__serverList);
+			$serverId = self::__allServers();
 		}
+
 		if (!is_array($serverId)) {
 			$serverId = array($serverId);
 		}
-		foreach ($serverId as $currentId) {
-			if (self::setActive($currentId)) {
-				$currentServer = &self::$__serverList[$currentId];
-				$currentServer['Socket'] = @fsockopen($currentServer['server'], $currentServer['server_port'], $errno, $errstr, 2);
-				if ($currentServer['Socket']) {
-					$currentServer['connect_status'] = 'connecting';
-					//We have connected to the server, now we have to send the login commands.
-					//self::sendCommand("PASS {$currentServer['server_password']}", null, true); //Sends the password not needed for most servers FIXME we need a null/empty password check
-					self::sendCommand("NICK {$currentServer['bot_name'][0]}", null, true); //sends the nickname FIXME. This only sends first nickname, won't cycle through to secondary ones
-					self::sendCommand("USER {$currentServer['bot_name'][0]} USING YOAR MOMS", null, true); //sends the user must have 4 paramters
 
-					//wait for the MOTD or for the server to disconnect us.
-					//this is not optimum, once we have each server in its own object, let it manage watching for messages.
-					while ($currentServer['connect_status'] == 'connecting' && !feof($currentServer['Socket'])) {
-						$Msg = self::receive($currentId);
-						if (!is_null($Msg) && $Msg->msgNumber == 376) {
-							$currentServer['connect_status'] = 'connected';
-						}
-					}
+		foreach ($serverId as $currentId) {
+			if (isset(self::$__serverList[$currentId])) {
+				$currentServer = self::$__serverList[$currentId];
+				if (!$currentServer->connected()) {
+					$currentServer->connect();
 				}
 			}
 		}
 		return $result;
 	}
 
-	
 	/**
 	 * Disconnect the server. Uh.
 	 * @todo uh.. do this? heh.
+	 * @todo refactor this and connect() into a "do X to Y" method for performing something on all servers
 	 */
 	public static function disconnect($serverId = null, $quitMessage = null) {
-		if (self::connected()) {
+		$error = false;  //was connection successful?
+		$currentServer = null; //refrence to the server that is being operated on.
 
+		//if the server is not specified, disconnect everything!
+		if (is_null($serverId)) {
+			$serverId = self::__allServers();
 		}
-		return false;
+
+		if (!is_array($serverId)) {
+			$serverId = array($serverId);
+		}
+
+		foreach ($serverId as $currentId) {
+			if (isset(self::$__serverList[$currentId])) {
+				$currentServer = self::$__serverList[$currentId];
+				if (!$currentServer->connected()) {
+					$currentServer->disconnect();
+				}
+			}
+		}
 	}
+
 	/**
 	 * check to see if a server is connected
-	 *  @param array server the server object
+	 *  @param integer $server the server id
 	 *  @todo change this to check a specified server
 	 */
 	public static function connected ($server = null) {
-		if (is_null($server)) {
-			$server = self::$__activeServer;
+		$result = false;
+		if (is_null($server)){
+			$server = self::__allServers('connected');
+			$result = (count($server));
+		} elseif (isset(self::$__serverList[$server])) {
+			$server = $__serverList[$server];
+			$result = $server->connected();
 		}
-		if (array_key_exists($server['list_id'], self::$__serverList)) {
-			return ($server['connect_status'] == 'connected' && !feof($server['Socket']));
-		}
+		return $result;
 	}
+
 	/**
 	 * Checks the active server for a message.  prolly should be inside the Server Object and
 	 *  be replaced by a polling function.
-	 *  @param integer serverId the id of the server to check {optional}
+	 *  @param integer $servers the id of the server to check {optional}
+	 *  @todo implement bookmarking so we don't ignore servers with chatty neighbors
 	 */
-	public static function receive($serverId = null) {
+	public static function receive($servers = null) {
+		$Server = null;
 		$Msg = null;
-		$line = fgets(self::$__activeServer['Socket'], 1024); //get a line of data from the server
-		if (!empty($line)) {
-			$Msg = new IrcMessage($line);
+		if ($servers == null) {
+			$servers = self::__allServers('connected');
 		}
-		if (!is_null($Msg)) {
-			self::__afterReceive($Msg);
+		foreach ($servers as $id) {
+			$Server = self::$__serverList[$id];
+			$Msg = $Server->receive();
+			if (!is_null($Msg)) {
+				break;
+			}
 		}
 		return $Msg;
 	}
+
 	/**
 	 * Send a command to the IRC server
-	 * @param string cmd Command to send,
-	 * @param integer serverId the server id to check for.
-	 * @param bool override don't check for connection. Needed for connecting.
+	 *  utility function so you don't have to intialise a variable every time.
+	 * @param string $cmd Command to send,
+	 * @param integer $serverId the server id to check for.
 	 * @todo need to seperate this into the server object and the code necc. for safty checking server.
 	 */
-	public static function sendCommand ($cmd, $serverId = null, $override = false) {
-		$cmd = $cmd . "\n\r";
-		if ($override || self::connected()) {
-			echo "[SEND] $cmd"; //displays it on the screen
-			@fwrite(self::$__activeServer['Socket'], $cmd, strlen($cmd)); //sends the command to the server
-			return true;
-		} else {
-			return false;
+	public static function sendCommand ($cmd, $server) {
+		$result = false;
+			if (isset(self::$__serverList[$server])) {
+				$server = self::$__serverList[$server];
+				$result = $server->sendCommand($cmd);
+			}
+		return $result;
+	}
+
+	public static function getServer($server) {
+		if (isset(self::$__serverList[$server])) {
+			return self::$__serverList[$server];
 		}
+		return false;
 	}
 }
 
@@ -286,7 +336,7 @@ class HappyServer {
 	 * @param string $cmd command to send
 	 * @return boolian success of command being sent.
 	 */
-	public function sendCommand ($cmd) {
+	public function sendCommand($cmd) {
 		$result = false;
 		$cmd = $cmd . "\n\r";
 		if ($this->__connectStatus == 'connecting' || $this->connected()) {
@@ -301,7 +351,7 @@ class HappyServer {
 	 * check to see if the server is connected
 	 *  @param array server the server object
 	 */
-	public function connected () {
+	public function connected() {
 		return ($this->__connectStatus == 'connected' && !feof($this->__Socket));
 	}
 
@@ -315,6 +365,7 @@ class HappyServer {
 		}
 		return false;
 	}
+
 
 	/**
 	 * Maintains the connection to the server and takes care of other incidentals.

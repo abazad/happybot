@@ -14,8 +14,7 @@ class HappyBotController extends HappyController {
 	 */
 	public function __construct() {
 		include("config.php");
-		$serverId = ConnectionManager::registerServer($IrcConfig);
-//		ConnectionManager::connect($serverId);  //not needed right now, auto-connects
+		ConnectionManager::registerServer($IrcConfig);
 	}
 
 	/**
@@ -36,7 +35,6 @@ class HappyBotController extends HappyController {
 				echo "oi! WTF! {$e} \n";
 			}
 		}
-
 		ConnectionManager::disconnect();
 	}
 	
