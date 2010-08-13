@@ -134,7 +134,9 @@ final class ConnectionManager {
 		if (!empty($line)) {
 			$Msg = new IrcMessage($line);
 		}
-		self::__afterReceive($Msg);
+		if (!is_null($Msg)) {
+			self::__afterReceive($Msg);
+		}
 		return $Msg;
 	}
 
@@ -354,5 +356,11 @@ class HappyController {
 		return ConnectionManager::sendCommand("PRIVMSG {$target} :{$message}", $serverId);
 	}
 	//needs methods to connect to the server list, register for callbacks, and to accept/clear target server.
+}
+/**
+ * Server object to be filled out
+ */
+class HappyServer {
+
 }
 ?>
